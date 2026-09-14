@@ -6,12 +6,14 @@ import os
 from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 
+from app.models.owner_model import Owner
 from app.services.email_services import send_otp_email
 from app.repository.owner_repository import (
     get_owner_by_email,
     get_owner_by_phone,
     create_owner
 )
+
 
 SECRET_KEY = os.getenv("JWT_SECRET_KEY")
 ALGORITHM = "HS256"
@@ -37,41 +39,71 @@ def generate_otp():
     return str(secrets.randbelow(900000) + 100000)
 
 
-def signup_owner( db: Session, name: str, email: str, phone: str, password: str):
+# signup service
+def signup_owner_without_otp(
+    db: Session,
+    name: str,
+    email: str,
+    phone: str,
+    password: str
+):
+    # Check if email or phone already exists
+    existing_owner = db.query(Owner).filter(
+        (Owner.email == email) | (Owner.phone == phone)
+    ).first()
 
-    # Check email
-    existing_email = get_owner_by_email(db, email)
+    if existing_owner:
+        raise ValueError("Email or phone already registered")
 
-    if existing_email:
-        raise ValueError("Email already registered")
-
-    # Check phone
-    existing_phone = get_owner_by_phone(db, phone)
-
-    if existing_phone:
-        raise ValueError("Phone number already registered")
-
-    # Hash password
+    # Hash password using your existing password-hashing function
     password_hash = hash_password(password)
 
-    # Generate OTP
-    otp = generate_otp()
+    # Create owner directly—no OTP
+    create_owner(
+        db=db,
+        name=name,
+        email=email,
+        phone=phone,
+        password=password_hash
+    )
 
-    # OTP expires after 5 minutes
-    expires_at = datetime.now() + timedelta(minutes=5)
+    return "Signup successful"
 
-    # Store temporary signup data
-    pending_signups[email] = {
-        "name": name,
-        "phone": phone,
-        "password_hash": password_hash,
-        "otp": otp,
-        "expires_at": expires_at,
-    }
+# def signup_owner( db: Session, name: str, email: str, phone: str, password: str):
 
-    send_otp_email(email, otp)
+#     # Check email
+#     existing_email = get_owner_by_email(db, email)
 
-    return "OTP sent successfully"
+#     if existing_email:
+#         raise ValueError("Email already registered")
+
+#     # Check phone
+#     existing_phone = get_owner_by_phone(db, phone)
+
+#     if existing_phone:
+#         raise ValueError("Phone number already registered")
+
+#     # Hash password
+#     password_hash = hash_password(password)
+
+#     # Generate OTP
+#     otp = generate_otp()
+
+#     # OTP expires after 5 minutes
+#     expires_at = datetime.now() + timedelta(minutes=5)
+
+#     # Store temporary signup data
+#     pending_signups[email] = {
+#         "name": name,
+#         "phone": phone,
+#         "password_hash": password_hash,
+#         "otp": otp,
+#         "expires_at": expires_at,
+#     }
+
+#     send_otp_email(email, otp)
+
+#     return "OTP sent successfully"
 
 # resend fucntion
 def resend_otp(email: str):

@@ -8,7 +8,7 @@ from app.models.building_model import Building
 
 class BedRepository:
 
-    # beds are creating for quick building create 
+    # beds are creating for quick building create
     def create_bed(self, db: Session, room_id: int, bed_number: str):
 
         bed = Bed(
@@ -29,14 +29,27 @@ class BedRepository:
             .scalar()
         )
 
-    #fetch all beds using a room id 
+    #fetch all beds using a room id
     def get_beds_by_room_id(self, db: Session, room_id):
         return (
             db.query(Bed).filter(Bed.room_id == room_id).all()
         )
 
+    def get_active_bed_count_by_room_id(self, db: Session, room_id: int):
+        return (
+            db.query(Bed)
+            .filter(
+                Bed.room_id == room_id,
+                Bed.status.in_([
+                    BedStatus.AVAILABLE,
+                    BedStatus.MAINTENANCE
+                ])
+            )
+            .count()
+        )
+
         
-    # create new bed 
+    # create new bed
     def create_new_bed(self, db: Session, room_id: int, bed_number: str):
 
         new_bed = Bed(
@@ -58,7 +71,7 @@ class BedRepository:
             .first()
         )
 
-    # check given bed id belongs to requested owner or not 
+    # check given bed id belongs to requested owner or not
     def is_bed_owned_by_owner(
         self,
         db: Session,
@@ -77,7 +90,7 @@ class BedRepository:
             .first()
         )
 
-    # delete bed / deactivate bed  
+    # delete bed / deactivate bed
     def deactivate_bed(self, db: Session, bed_id: int):
 
         bed = (

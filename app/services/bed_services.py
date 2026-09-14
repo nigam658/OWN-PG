@@ -4,15 +4,19 @@ from app.repository.bed_Repository import bed_repository
 from app.repository.room_Repository import room_repository
 from app.repository.bed_allocation_repository import bed_allocation_repository
 from app.repository.tenant_repository import tenant_repository
+from app.models.bed_model import BedStatus
 
 class BedService:
 
-    def add_bed(self, db: Session, room_id: int):
+    def add_bed(self, db: Session, room_id: int, owner_id: int):
 
-        owner_id = 1
 
-        # if room not exist return None 
-        room = room_repository.get_room_by_id_and_owner(db, room_id, owner_id=owner_id)
+        # If room does not exist, return None
+        room = room_repository.get_room_by_id_and_owner(
+            db,
+            room_id,
+            owner_id=owner_id
+        )
 
         if not room:
             return None
@@ -22,6 +26,20 @@ class BedService:
             room_id
         )
 
+        # Sort beds by bed number
+        beds.sort(key=lambda bed: bed.bed_number)
+
+        # Reuse the first inactive bed
+        for bed in beds:
+            if bed.status == BedStatus.INACTIVE:
+                bed.status = BedStatus.AVAILABLE
+
+                db.commit()
+                db.refresh(bed)
+
+                return bed
+
+        # No inactive bed exists → create a new bed
         existing_bed_numbers = set()
 
         for bed in beds:

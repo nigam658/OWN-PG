@@ -6,6 +6,12 @@ from app.models.bed_allocation_model import (
     AllocationStatus
 )
 
+from app.models.tenant_model import Tenant
+from app.models.bed_model import Bed
+from app.models.room_model import Room
+from app.models.floor_model import Floor
+from app.models.building_model import Building
+
 class BedAllocationRepository:
 
     def get_active_allocation_by_bed_id(self, db: Session, bed_id: int):
@@ -66,5 +72,31 @@ class BedAllocationRepository:
             .first()
         )
 
+
+    # Get all active and notice-period bed allocations
+    # for a specific building owned by the logged-in owner.
+    def get_active_allocations_by_building_id(
+        self,
+        db: Session,
+        owner_id: int,
+        building_id: int
+    ):
+        return (
+            db.query(BedAllocation)
+            .join(Tenant, BedAllocation.tenant_id == Tenant.id)
+            .join(Bed, BedAllocation.bed_id == Bed.id)
+            .join(Room, Bed.room_id == Room.id)
+            .join(Floor, Room.floor_id == Floor.id)
+            .join(Building, Floor.building_id == Building.id)
+            .filter(
+                Building.id == building_id,
+                Building.owner_id == owner_id,
+                BedAllocation.status.in_([
+                    AllocationStatus.ACTIVE,
+                    AllocationStatus.NOTICE_PERIOD
+                ])
+            )
+            .all()
+        )
 
 bed_allocation_repository = BedAllocationRepository()

@@ -84,7 +84,7 @@ class RoomService :
 
         for room in rooms:
 
-            beds = bed_repository.get_beds_by_room_id(
+            total_beds = bed_repository.get_active_bed_count_by_room_id(
                 db=db,
                 room_id=room.id
             )
@@ -92,12 +92,10 @@ class RoomService :
             rooms_data.append({
                 "id": room.id,
                 "room_number": room.room_number,
-                "total_beds": len(beds)
+                "total_beds": total_beds
             })
 
         return rooms_data
-        
-
     
 
 room_service = RoomService()

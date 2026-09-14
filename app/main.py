@@ -1,3 +1,6 @@
+from dotenv import load_dotenv
+load_dotenv()
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -7,6 +10,7 @@ from app.routers.tenant_router import router as tenant_router
 from app.routers.auth_router import router as auth_router
 from app.routers.building_router import router as building_router
 from app.routers.floor_router import router as floor_router
+from app.routers.monthlyRent_router import router as monthly_rent_router
 
 from app.database import Base, engine
 from app.models.owner_model import Owner
@@ -39,3 +43,4 @@ app.include_router(tenant_router)
 app.include_router(auth_router)
 app.include_router(building_router)
 app.include_router(floor_router)
+app.include_router(monthly_rent_router)

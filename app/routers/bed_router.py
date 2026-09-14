@@ -11,11 +11,11 @@ router = APIRouter(
     tags=["Beds"]
 )
 
-@router.post("/rooms/{room_id}/beds")
-def add_bed(room_id: int, db: Session = Depends(get_db)):
+@router.post("/rooms/{room_id}")
+def add_bed(room_id: int, db: Session = Depends(get_db), current_user = Depends(get_current_user)):
 
     # add new bed
-    new_bed = bed_service.add_bed(db, room_id)
+    new_bed = bed_service.add_bed(db, room_id, current_user)
 
     if not new_bed:
         return {

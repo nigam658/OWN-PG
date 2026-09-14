@@ -6,6 +6,10 @@ import os
 load_dotenv()
 DATABASE_URL = os.getenv("DATABASE_URL")
 
+if not DATABASE_URL:
+    raise RuntimeError("DATABASE_URL is not configured")
+
+
 # When SQLAlchemy needs to talk to MySQL, the engine uses these credentials to connect which is hold DATABASE_URL
 engine = create_engine(DATABASE_URL) 
 

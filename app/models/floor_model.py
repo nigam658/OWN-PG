@@ -23,7 +23,7 @@ class Floor(Base):
 
     created_at = Column(DateTime, default=now_ist, nullable=False)
 
-    updated_at = Column(DateTime,default=now_ist, onupdate=now_ist, nullable=False) 
+    updated_at = Column(DateTime,default=now_ist, onupdate=now_ist, nullable=False)
 
 
     

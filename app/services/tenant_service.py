@@ -8,7 +8,7 @@ from app.repository.bed_allocation_repository import bed_allocation_repository
 from app.models.tenant_model import TenantStatus
 from app.models.bed_allocation_model import AllocationStatus
 from app.models.bed_model import BedStatus
-
+from app.repository.monthlyRent_repository import monthly_rent_repository
 
 class TenantService:
 
@@ -71,6 +71,7 @@ class TenantService:
             # Create tenant
             new_tenant = tenant_repository.create_tenant(db, tenant_data, owner_id)
 
+            # Create bed allocation
             new_allocation = bed_allocation_repository.create_allocation(
                 db=db,
                 bed_id=bed_id,
@@ -78,6 +79,14 @@ class TenantService:
                 check_in_date=tenant_data.check_in_date,
                 rent=tenant_data.rent,
                 security_deposit=tenant_data.security_deposit
+            )
+
+            # Create first monthly rent
+            monthly_rent_repository.create_monthly_rent(
+                db=db,
+                bed_allocation_id=new_allocation.id,
+                due_date=tenant_data.check_in_date,
+                rent_amount=tenant_data.rent
             )
 
             db.commit()
