@@ -11,6 +11,11 @@ if not DATABASE_URL:
 
 
 # When SQLAlchemy needs to talk to MySQL, the engine uses these credentials to connect which is hold DATABASE_URL
+if DATABASE_URL.startswith("mysql://"):
+    DATABASE_URL = DATABASE_URL.replace(
+        "mysql://", "mysql+pymysql://", 1
+    )
+
 engine = create_engine(DATABASE_URL) 
 
 # this base tell SQLAlchemy this python class is a databasemodel, otherwise python ignore database class
