@@ -17,6 +17,14 @@ database_url = os.getenv("DATABASE_URL")
 if not database_url:
     raise RuntimeError("DATABASE_URL is not set")
 
+# Use PyMySQL for MySQL migrations.
+if database_url.startswith("mysql://"):
+    database_url = database_url.replace(
+        "mysql://",
+        "mysql+pymysql://",
+        1
+    )
+
 config.set_main_option(
     "sqlalchemy.url",
     database_url.replace("%", "%%")
