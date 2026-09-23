@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, DateTime, ForeignKey, UniqueConstraint
+from sqlalchemy import Column, Integer, DateTime, ForeignKey, UniqueConstraint, Boolean
 
 from app.utils.time import now_ist
 from app.database import Base
@@ -21,9 +21,10 @@ class Floor(Base):
 
     floor_number = Column(Integer, nullable=False)
 
+    is_active = Column(Boolean, default=True, nullable=False)
+
+    deleted_at = Column(DateTime, nullable=True)
+
     created_at = Column(DateTime, default=now_ist, nullable=False)
 
     updated_at = Column(DateTime,default=now_ist, onupdate=now_ist, nullable=False)
-
-
-    

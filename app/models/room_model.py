@@ -1,4 +1,4 @@
-from sqlalchemy import (Column, Integer, DateTime,String, ForeignKey, UniqueConstraint)
+from sqlalchemy import (Column, Integer, DateTime,String, ForeignKey, UniqueConstraint, Boolean)
 from app.utils.time import now_ist
  
 from app.database import Base
@@ -20,6 +20,10 @@ class Room(Base):
     floor_id = Column(Integer, ForeignKey("floors.id"), nullable=False)
 
     room_number = Column(String(10), nullable=False)
+
+    is_active = Column( Boolean, default=True, nullable=False ) 
+
+    deleted_at = Column( DateTime, nullable=True )
 
     created_at = Column(DateTime, default=now_ist, nullable=False)
 

@@ -1,9 +1,13 @@
 from datetime import date
 from sqlalchemy.orm import Session
+from fastapi import HTTPException
 
+from app.models.building_model import Building
 from app.repository.bed_allocation_repository import bed_allocation_repository
 from app.repository.monthlyRent_repository import monthly_rent_repository
+from app.repository.payment_repository import payment_repository
 from app.utils.date_utils import get_next_due_date
+from app.utils.time import now_ist
 
 from app.schemas.monthlyRent_schema import CollectRentRequest
 from app.schemas.monthlyRent_schema import DueRentResponse
@@ -209,6 +213,15 @@ class MonthlyRentService:
 
             monthly_rent.status = MonthlyRentStatus.PARTIAL
 
+        # Record the actual money collected.
+        payment_repository.create_payment(
+            db=db,
+            monthly_rent_id=monthly_rent.id,
+            amount=rent_data.amount,
+            payment_date=now_ist()
+        )
+
+
         try:
 
             db.commit()
@@ -222,6 +235,52 @@ class MonthlyRentService:
         return {
             "success": True,
             "message": "Rent collected successfully."
+        }
+
+
+    def get_current_month_collection(
+        self,
+        db: Session,
+        owner_id: int,
+        building_id: int
+    ):
+        # Make sure the building belongs to the logged-in owner.
+        building = (
+            db.query(Building)
+            .filter(
+                Building.id == building_id,
+                Building.owner_id == owner_id
+            )
+            .first()
+        )
+
+        if building is None:
+            raise HTTPException(
+                status_code=404,
+                detail="Building not found"
+            )
+
+        # Get the first day of the current month.
+        today = date.today()
+        start_date = today.replace(day=1)
+
+        # Get the first day of the next month.
+        if today.month == 12:
+            end_date = date(today.year + 1, 1, 1)
+        else:
+            end_date = date(today.year, today.month + 1, 1)
+
+        # Get actual rent money collected for this building.
+        total_collected = payment_repository.get_current_month_collection(
+            db=db,
+            building_id=building_id,
+            start_date=start_date,
+            end_date=end_date
+        )
+
+        return {
+            "building_id": building_id,
+            "total_collected": total_collected
         }
 
 monthly_rent_service = MonthlyRentService()

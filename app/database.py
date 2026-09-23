@@ -19,7 +19,7 @@ if DATABASE_URL.startswith("mysql://"):
 engine = create_engine(DATABASE_URL) 
 
 # this base tell SQLAlchemy this python class is a databasemodel, otherwise python ignore database class
-Base = declarative_base()  
+Base = declarative_base()
 
 SessionLocal = sessionmaker(
     autocommit = False,

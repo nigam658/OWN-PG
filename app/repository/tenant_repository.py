@@ -31,13 +31,25 @@ class TenantRepository():
         db.flush()
         return new_tenant
 
-
+    # update a tenant 
     def update_tenant(self, db: Session, tenant_id: int, data: dict):
 
         update_query = (
             update(Tenant)
             .where(Tenant.id == tenant_id)
             .values(**data)
+        )
+
+        db.execute(update_query)
+
+
+    # Mark a tenant as inactive.
+    def deactivate_tenant(self, db: Session, tenant_id: int):
+
+        update_query = (
+            update(Tenant)
+            .where(Tenant.id == tenant_id)
+            .values(status=TenantStatus.INACTIVE)
         )
 
         db.execute(update_query)

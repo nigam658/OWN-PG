@@ -1,10 +1,13 @@
 from sqlalchemy.orm import Session
+from datetime import date
 
 from app.repository.bed_Repository import bed_repository
 from app.repository.room_Repository import room_repository
 from app.repository.bed_allocation_repository import bed_allocation_repository
 from app.repository.tenant_repository import tenant_repository
 from app.models.bed_model import BedStatus
+from app.models.monthlyrent_model import MonthlyRentStatus
+from app.repository.monthlyRent_repository import monthly_rent_repository
 
 class BedService:
 
@@ -79,9 +82,10 @@ class BedService:
         )
 
         beds_data = []
+        today = date.today()
+
 
         for bed in beds:
-
             # Get active allocation for this bed
             allocation = (
                 bed_allocation_repository
@@ -97,7 +101,10 @@ class BedService:
                 "bed_number": bed.bed_number,
                 "status": bed.status.value,
                 "rent": None,
-                "tenant": None
+                "tenant": None,
+                "payment_status": None,
+                "unpaid_months": 0
+
             }
 
             # Add tenant information if an active allocation exists
@@ -111,8 +118,50 @@ class BedService:
                 if tenant:
                     bed_info["tenant"] = {
                         "tenant_id": tenant.id,
-                        "full_name": tenant.full_name
+                        "full_name": tenant.full_name,
+                        "phone": tenant.phone,
+                        "check_in_date": allocation.check_in_date.isoformat()
                     }
+
+                
+                # Get all monthly rent records for this allocation
+                monthly_rents = (
+                    monthly_rent_repository
+                    .get_monthly_rents_by_allocation_id(
+                        db=db,
+                        bed_allocation_id=allocation.id
+                    )
+                )
+
+                # Consider only rent records whose due date has arrived
+                due_rents = [
+                    rent for rent in monthly_rents
+                    if rent.due_date <= today
+                ]
+
+                # No rent records are due yet → hide the payment badge
+                if not due_rents:
+                    bed_info["payment_status"] = None
+                    bed_info["unpaid_months"] = 0
+
+                else:
+                    # Count records that are DUE or PARTIAL
+                    unpaid_months = sum(
+                        1
+                        for rent in due_rents
+                        if rent.status in (
+                            MonthlyRentStatus.DUE,
+                            MonthlyRentStatus.PARTIAL
+                        )
+                    )
+
+                    bed_info["unpaid_months"] = unpaid_months
+
+                    # All due records are paid
+                    if unpaid_months == 0:
+                        bed_info["payment_status"] = "PAID"
+                    else:
+                        bed_info["payment_status"] = "UNPAID"
 
             beds_data.append(bed_info)
 

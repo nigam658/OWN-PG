@@ -139,4 +139,41 @@ class MonthlyRentRepository:
         )
 
 
+    # Get the number of tenants in a room who currently have unpaid rent
+    def get_unpaid_tenant_count_by_room_id(
+        self,
+        db: Session,
+        room_id: int,
+        today: date
+    ):
+        return (
+            db.query(BedAllocation.tenant_id)
+            .join(
+                MonthlyRent,
+                MonthlyRent.bed_allocation_id == BedAllocation.id
+            )
+            .join(
+                Bed,
+                BedAllocation.bed_id == Bed.id
+            )
+            .filter(
+                Bed.room_id == room_id,
+
+                # Tenant is active or in notice period
+                BedAllocation.status.in_([
+                    AllocationStatus.ACTIVE,
+                    AllocationStatus.NOTICE_PERIOD
+                ]),
+
+                # Rent is due
+                MonthlyRent.due_date <= today,
+
+                # Rent is not fully paid
+                MonthlyRent.paid_amount < MonthlyRent.rent_amount
+            )
+            .distinct()
+            .count()
+        )
+
+
 monthly_rent_repository = MonthlyRentRepository()

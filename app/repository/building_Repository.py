@@ -15,8 +15,15 @@ class BuildingRepository:
                 Building,
                 func.count(Room.id).label("total_rooms")
             )
-            .outerjoin(Floor, Floor.building_id == Building.id)
-            .outerjoin(Room, Room.floor_id == Floor.id)
+            .outerjoin(
+                Floor,
+                Floor.building_id == Building.id
+            )
+            .outerjoin(
+                Room,
+                (Room.floor_id == Floor.id) &
+                (Room.is_active.is_(True))
+            )
             .filter(Building.owner_id == owner_id)
             .group_by(Building.id)
             .all()

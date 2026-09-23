@@ -19,6 +19,22 @@ class RoomRepository:
 
         return room
 
+    # Find a room number on a specific floor.
+    def get_room_by_floor_and_number(
+        self,
+        db: Session,
+        floor_id: int,
+        room_number: str
+    ):
+        return (
+            db.query(Room)
+            .filter(
+                Room.floor_id == floor_id,
+                Room.room_number == room_number
+            )
+            .first()
+        )
+
     # this fucntion used for checking when owner search any room , it check searched room exist or not 
     def get_room_by_number(self, db:Session, room_number:str, owner_id : int):
         return (
@@ -54,7 +70,10 @@ class RoomRepository:
     def get_rooms_by_floor_id(self, db: Session, floor_id: int):
         return (
             db.query(Room)
-            .filter(Room.floor_id == floor_id)
+            .filter(
+                Room.floor_id == floor_id,
+                Room.is_active.is_(True)
+            )
             .order_by(Room.room_number)
             .all()
         )

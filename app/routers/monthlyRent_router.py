@@ -43,3 +43,16 @@ def collect_rent(
     )
 
     return result
+
+# current month collected money dashboard
+@router.get("/building/{building_id}/current-month-collection")
+def get_current_month_collection(
+    building_id: int,
+    db: Session = Depends(get_db),
+    owner_id: int = Depends(get_current_user)
+):
+    return monthly_rent_service.get_current_month_collection(
+        db=db,
+        owner_id=owner_id,
+        building_id=building_id
+    )

@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
 
 from app.models.floor_model import Floor
+from app.models.building_model import Building
 
 
 class FloorRepository:
@@ -24,6 +25,22 @@ class FloorRepository:
             .filter(Floor.building_id == building_id)
             .order_by(Floor.floor_number)
             .all()
+        )
+
+    def get_floor_by_id_and_owner_id(
+        self,
+        db: Session,
+        floor_id: int,
+        owner_id: int
+    ):
+        return (
+            db.query(Floor)
+            .join(Building, Floor.building_id == Building.id)
+            .filter(
+                Floor.id == floor_id,
+                Building.owner_id == owner_id
+            )
+            .first()
         )
 
 

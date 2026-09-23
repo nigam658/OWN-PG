@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.schemas.room_schema import RoomCreate
 from app.services.room_services import room_service
 from app.dependencies.auth_dependencies import get_current_user
 
@@ -26,6 +27,27 @@ def get_rooms_by_floor_id(floor_id: int, db: Session = Depends(get_db), owner_id
 
     return room_service.get_rooms_by_floor_id(
         db,
-        floor_id
+        floor_id,
+        owner_id
     )
 
+
+# Delete a room
+@router.delete("/{room_id}")
+def delete_room(room_id: int, db: Session = Depends(get_db), owner_id: int = Depends(get_current_user)):
+    
+    return room_service.delete_room(
+        db=db,
+        room_id=room_id,
+        owner_id=owner_id
+    )
+
+
+@router.post("/AddRoom")
+def add_room(data: RoomCreate, db: Session = Depends(get_db), owner_id: int = Depends(get_current_user)):
+
+    return room_service.add_room(
+        db=db,
+        data=data,
+        owner_id=owner_id
+    )

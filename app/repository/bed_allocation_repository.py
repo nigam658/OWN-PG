@@ -18,8 +18,7 @@ class BedAllocationRepository:
         return (
             db.query(BedAllocation)
             .filter(
-                BedAllocation.bed_id == bed_id,
-                
+                BedAllocation.bed_id == bed_id,           
                 BedAllocation.status == AllocationStatus.ACTIVE
             )
             .first()
@@ -72,6 +71,48 @@ class BedAllocationRepository:
             .first()
         )
 
+    # Get the number of beds in a room that currently have an active allocation
+    def get_active_allocation_count_by_room_id(
+        self,
+        db: Session,
+        room_id: int
+    ):
+        return (
+            db.query(BedAllocation)
+            .join(Bed, BedAllocation.bed_id == Bed.id)
+            .filter(
+                Bed.room_id == room_id,
+                BedAllocation.status == AllocationStatus.ACTIVE
+            )
+            .count()
+        )
+
+
+    # using for delete room
+    # Get active allocations for a room.
+    def get_active_allocations_by_room_id(
+        self,
+        db: Session,
+        room_id: int
+    ):
+        return (
+            db.query(BedAllocation)
+
+            # Join beds to filter by room.
+            .join(
+                Bed,
+                BedAllocation.bed_id == Bed.id
+            )
+
+            # Get only active allocations.
+            .filter(
+                Bed.room_id == room_id,
+                BedAllocation.status == AllocationStatus.ACTIVE
+            )
+
+            .all()
+        )
+
 
     # Get all active and notice-period bed allocations
     # for a specific building owned by the logged-in owner.
@@ -98,5 +139,7 @@ class BedAllocationRepository:
             )
             .all()
         )
+
+    
 
 bed_allocation_repository = BedAllocationRepository()

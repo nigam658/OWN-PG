@@ -109,4 +109,17 @@ class BedRepository:
 
         return bed
 
+    # Fetch room beds in bed-number order.
+    def get_beds_by_room_id_ordered(
+        self,
+        db: Session,
+        room_id: int
+    ):
+        return (
+            db.query(Bed)
+            .filter(Bed.room_id == room_id)
+            .order_by(Bed.bed_number)
+            .all()
+        )
+
 bed_repository = BedRepository()
