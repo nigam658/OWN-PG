@@ -17,7 +17,7 @@ from app.repository.owner_repository import (
 
 SECRET_KEY = os.getenv("JWT_SECRET_KEY")
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+ACCESS_TOKEN_EXPIRE_MINUTES = 30 * 24 * 60  # 30 days
 REFRESH_TOKEN_EXPIRE_DAYS = 7
 
 
