@@ -21,15 +21,19 @@ class BuildingService:
 
         buildings_data = []
 
-        for building, total_rooms in buildings:
+        for building, total_rooms, total_beds, occupied_beds in buildings:
 
             building_info = {
                 "id": building.id,
                 "name": building.name,
                 "address": building.address,
                 "city": building.city,
-                "total_rooms": total_rooms
+                "total_rooms": total_rooms,
+                "total_beds": total_beds,
+                "occupied_beds": occupied_beds,
+                "available_beds": total_beds - occupied_beds
             }
+
 
             buildings_data.append(building_info)
 
