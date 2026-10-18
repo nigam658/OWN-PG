@@ -1,4 +1,4 @@
-from sqlalchemy import (Column, Integer, Date, DateTime, ForeignKey, Numeric, Enum)
+from sqlalchemy import (Column, Integer, Date, DateTime, ForeignKey, Numeric, Enum, Boolean,)
 from datetime import datetime
 from enum import Enum as PyEnum
 
@@ -7,7 +7,6 @@ from app.database import Base
 
 class AllocationStatus(PyEnum):
     ACTIVE = "ACTIVE"
-    NOTICE_PERIOD = "NOTICE_PERIOD"
     CHECKED_OUT = "CHECKED_OUT"
 
 
@@ -25,6 +24,9 @@ class BedAllocation(Base):
 
     rent = Column(Numeric(10, 2), nullable=False)
     security_deposit = Column(Numeric(10, 2), default=0, nullable=False)
+
+    # Tracks whether the tenant is marked as vacating.
+    is_vacating = Column(Boolean, default=False, nullable=False)
 
     status = Column(Enum(AllocationStatus), default=AllocationStatus.ACTIVE, nullable=False)
 

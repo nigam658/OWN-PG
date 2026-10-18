@@ -80,3 +80,23 @@ def delete_bed(
         "exists": True,
         "message": "Bed deleted successfully."
     }
+
+
+@router.get("/building/{building_id}/empty")
+def get_empty_beds_by_building(
+    building_id: int,
+    db: Session = Depends(get_db),
+    owner_id: int = Depends(get_current_user)
+):
+    try:
+        return bed_service.get_empty_beds_by_building_id(
+            db=db,
+            building_id=building_id,
+            owner_id=owner_id
+        )
+
+    except ValueError as e:
+        raise HTTPException(
+            status_code=404,
+            detail=str(e)
+        )

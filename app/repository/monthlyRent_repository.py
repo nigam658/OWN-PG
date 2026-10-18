@@ -49,6 +49,26 @@ class MonthlyRentRepository:
             .all()
         )
 
+    # Get a rent record for one specific allocation and billing month.
+    # This helps us check whether the selected month already has rent.
+    def get_monthly_rent_by_allocation_and_billing_month(
+        self,
+        db: Session,
+        bed_allocation_id: int,
+        billing_month: date
+    ):
+        # Normalize the requested date to the first day of its month.
+        billing_month = billing_month.replace(day=1)
+
+        return (
+            db.query(MonthlyRent)
+            .filter(
+                MonthlyRent.bed_allocation_id == bed_allocation_id,
+                MonthlyRent.billing_month == billing_month
+            )
+            .first()
+        )
+
     # Get one monthly rent record that belongs to an owner
     def get_monthly_rent_by_id_and_owner(
         self,
@@ -122,11 +142,8 @@ class MonthlyRentRepository:
                 # Only the requested building
                 Building.id == building_id,
 
-                # Tenant must still be active or in notice period
-                BedAllocation.status.in_([
-                    AllocationStatus.ACTIVE,
-                    AllocationStatus.NOTICE_PERIOD
-                ]),
+                # Only active allocations are included
+                BedAllocation.status == AllocationStatus.ACTIVE,
 
                 # Rent due date has arrived
                 MonthlyRent.due_date <= today,
@@ -161,8 +178,8 @@ class MonthlyRentRepository:
 
                 # Tenant is active or in notice period
                 BedAllocation.status.in_([
-                    AllocationStatus.ACTIVE,
-                    AllocationStatus.NOTICE_PERIOD
+                    AllocationStatus.ACTIVE
+                    
                 ]),
 
                 # Rent is due

@@ -1,4 +1,4 @@
-from sqlalchemy import (Column, Integer, Date, DateTime, ForeignKey, Numeric, UniqueConstraint, Enum,)
+from sqlalchemy import (Column, Integer, Date, DateTime, ForeignKey, Numeric, UniqueConstraint, Enum, Computed,)
 from datetime import datetime
 from enum import Enum as PyEnum
 
@@ -17,8 +17,8 @@ class MonthlyRent(Base):
     __table_args__ = (
         UniqueConstraint(
             "bed_allocation_id",
-            "due_date",
-            name="uq_bed_allocation_due_date",
+            "billing_month",
+            name="uq_bed_allocation_billing_month",
         ),
     )
 
@@ -27,6 +27,16 @@ class MonthlyRent(Base):
     bed_allocation_id = Column(Integer,ForeignKey("bed_allocations.id"),nullable=False)
 
     due_date = Column(Date, nullable=False)
+
+    # MySQL calculates the first day of the month from due_date.
+    billing_month = Column(
+        Date,
+        Computed(
+            "DATE_SUB(due_date, INTERVAL (DAYOFMONTH(due_date) - 1) DAY)",
+            persisted=True,
+        ),
+        nullable=False,
+    )
 
     rent_amount = Column(Numeric(10, 2), nullable=False)
 

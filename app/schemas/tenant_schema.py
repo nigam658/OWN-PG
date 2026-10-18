@@ -1,6 +1,7 @@
-from datetime import date
-from pydantic import BaseModel, Field, field_validator
+from datetime import date, datetime
+from pydantic import BaseModel, Field, field_validator, model_validator
 from decimal import Decimal
+from zoneinfo import ZoneInfo
 import re
 
 from app.models.tenant_model import Gender
@@ -120,3 +121,37 @@ class TenantUpdate(BaseModel):
             raise ValueError("This field must contain only digits")
 
         return value
+
+# Request schema used when switching a tenant to another bed
+class SwitchTenantBed(BaseModel):
+
+    # ID of the new bed where the tenant should be moved
+    bed_id: int = Field(gt=0)
+
+
+# Request body for marking a tenant as vacating
+# or cancelling their vacating status.
+class VacatingUpdate(BaseModel):
+    is_vacating: bool
+    expected_checkout_date: date | None = None
+
+    @model_validator(mode="after")
+    def validate_expected_checkout_date(self):
+        # A checkout date is mandatory when marking as vacating.
+        if self.is_vacating and self.expected_checkout_date is None:
+            raise ValueError(
+                "Please select the expected checkout date."
+            )
+
+        # Do not allow a checkout date before today's date in India.
+        if self.is_vacating:
+            today = datetime.now(
+                ZoneInfo("Asia/Kolkata")
+            ).date()
+
+            if self.expected_checkout_date < today:
+                raise ValueError(
+                    "Expected checkout date cannot be before today."
+                )
+
+        return self

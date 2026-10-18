@@ -114,8 +114,8 @@ class BedAllocationRepository:
         )
 
 
-    # Get all active and notice-period bed allocations
-    # for a specific building owned by the logged-in owner.
+    # Get active bed allocations for a specific building
+    # owned by the logged-in owner.
     def get_active_allocations_by_building_id(
         self,
         db: Session,
@@ -132,14 +132,12 @@ class BedAllocationRepository:
             .filter(
                 Building.id == building_id,
                 Building.owner_id == owner_id,
-                BedAllocation.status.in_([
-                    AllocationStatus.ACTIVE,
-                    AllocationStatus.NOTICE_PERIOD
-                ])
+
+                # Only active allocations are included.
+                BedAllocation.status == AllocationStatus.ACTIVE
             )
             .all()
         )
 
-    
 
 bed_allocation_repository = BedAllocationRepository()

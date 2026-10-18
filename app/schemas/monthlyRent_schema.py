@@ -28,3 +28,7 @@ class DueRentResponse(BaseModel):
 class CollectRentRequest(BaseModel):
     monthly_rent_id: int
     amount: Decimal = Field(gt=0)
+
+# Request body for generating rent for one selected month.
+class GenerateMissingRentRequest(BaseModel):
+    billing_month: date

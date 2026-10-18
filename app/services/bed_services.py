@@ -7,6 +7,7 @@ from app.repository.bed_allocation_repository import bed_allocation_repository
 from app.repository.tenant_repository import tenant_repository
 from app.models.bed_model import BedStatus
 from app.models.monthlyrent_model import MonthlyRentStatus
+from app.models.building_model import Building
 from app.repository.monthlyRent_repository import monthly_rent_repository
 
 class BedService:
@@ -120,7 +121,8 @@ class BedService:
                         "tenant_id": tenant.id,
                         "full_name": tenant.full_name,
                         "phone": tenant.phone,
-                        "check_in_date": allocation.check_in_date.isoformat()
+                        "check_in_date": allocation.check_in_date.isoformat(),
+                        "is_vacating": allocation.is_vacating
                     }
 
                 
@@ -209,5 +211,47 @@ class BedService:
             "success": True,
             "message": "Bed deleted successfully."
         }
+
+    
+        # Get empty beds for a building owned by the current user.
+    def get_empty_beds_by_building_id(
+        self,
+        db: Session,
+        building_id: int,
+        owner_id: int
+    ):
+        # Verify the building exists and belongs to this owner.
+        building = db.query(Building).filter(
+            Building.id == building_id,
+            Building.owner_id == owner_id
+        ).first()
+
+        # Return a friendly error if the building is missing or belongs to another owner.
+        if not building:
+            raise ValueError(
+                "Building not found or you don't have permission to access it."
+            )
+
+        # Fetch eligible empty beds using the repository.
+        empty_beds = bed_repository.get_empty_beds_by_building_id(
+            db=db,
+            building_id=building_id,
+            owner_id=owner_id
+        )
+
+        # Group eligible beds by room.
+        rooms = {}
+
+        for bed, room_number in empty_beds:
+            if room_number not in rooms:
+                rooms[room_number] = {
+                    "room_number": room_number,
+                    "empty_bed_count": 0
+                }
+
+            rooms[room_number]["empty_bed_count"] += 1
+
+        return list(rooms.values())
+
     
 bed_service = BedService()

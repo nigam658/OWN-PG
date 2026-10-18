@@ -39,16 +39,14 @@ class BuildingRepository:
                     )
                 ).label("total_beds"),
 
-                # Count only occupied active beds.
-                # ACTIVE and NOTICE_PERIOD allocations are considered occupied.
+                # Count occupied beds.
+                # Vacating tenants remain ACTIVE until actual checkout,
+                # so they continue to count as occupying their beds.
                 func.count(
                     func.distinct(
                         case(
                             (
-                                BedAllocation.status.in_([
-                                    AllocationStatus.ACTIVE,
-                                    AllocationStatus.NOTICE_PERIOD
-                                ]),
+                                BedAllocation.status == AllocationStatus.ACTIVE,
                                 Bed.id
                             )
                         )
