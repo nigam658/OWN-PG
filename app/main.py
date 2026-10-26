@@ -11,6 +11,7 @@ from app.routers.auth_router import router as auth_router
 from app.routers.building_router import router as building_router
 from app.routers.floor_router import router as floor_router
 from app.routers.monthlyRent_router import router as monthly_rent_router
+from app.routers.advance_booking_router import router as advance_booking_router
 
 from app.database import Base, engine
 from app.models.owner_model import Owner
@@ -22,6 +23,7 @@ from app.models.tenant_model import Tenant
 from app.models.bed_allocation_model import BedAllocation
 from app.models.payment_model import Payment
 from app.models.monthlyrent_model import MonthlyRent
+from app.models.advance_booking_model import PreBookingAdvance
 
 app = FastAPI()
 
@@ -44,3 +46,4 @@ app.include_router(auth_router)
 app.include_router(building_router)
 app.include_router(floor_router)
 app.include_router(monthly_rent_router)
+app.include_router(advance_booking_router)

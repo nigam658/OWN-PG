@@ -11,3 +11,12 @@ __pycache__/
 
 .DS_Store
 Thumbs.db
+
+# Database backups
+*.sql
+*.sqlite
+*.sqlite3
+
+# Secrets and credentials
+*.pem
+*.key

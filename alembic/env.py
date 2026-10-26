@@ -50,6 +50,7 @@ from app.models.tenant_model import Tenant
 from app.models.bed_allocation_model import BedAllocation
 from app.models.monthlyrent_model import MonthlyRent
 from app.models.payment_model import Payment
+from app.models.advance_booking_model import PreBookingAdvance
 
 target_metadata = Base.metadata
 
