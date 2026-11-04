@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
+from fastapi import Query
 
 from app.database import get_db
 from app.services.monthlyRent_service import monthly_rent_service
@@ -91,19 +92,20 @@ def generate_selected_missing_rent(
     )
 
 
-# Get current month's payment history for a building.
 @router.get("/building/{building_id}/payment-history")
 def get_building_payment_history(
     building_id: int,
+    month: int | None = Query(None, ge=1, le=12),
+    year: int | None = Query(None, ge=2000, le=2100),
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user)
 ):
-    # Get the authenticated owner's ID.
     owner_id = current_user
 
-    # Fetch the payment history and total from the service.
     return monthly_rent_service.get_building_payment_history(
         db=db,
         owner_id=owner_id,
-        building_id=building_id
+        building_id=building_id,
+        month=month,
+        year=year
     )

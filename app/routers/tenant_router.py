@@ -173,7 +173,8 @@ def get_bed_tenant_endpoint(
         },
 
         # NEW: Provide the next scheduled rent date for the confirmation popup.
-        "next_rent_date": result["next_rent_date"]
+        "next_rent_date": result["next_rent_date"],
+        "rent_history": result["rent_history"]
 
     }
 

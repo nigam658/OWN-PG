@@ -554,7 +554,9 @@ class MonthlyRentService:
         self,
         db: Session,
         owner_id: int,
-        building_id: int
+        building_id: int,
+        month: int | None = None,
+        year: int | None = None
     ):
         # Verify that the selected building belongs to this owner.
         building = (
@@ -572,19 +574,29 @@ class MonthlyRentService:
                 detail="Building not found"
             )
 
-        # Get the current date.
+        # Both month and year must be provided together.
+        if (month is None) != (year is None):
+            raise HTTPException(
+                status_code=400,
+                detail="Both month and year must be provided"
+            )
+
+        # If no month/year is provided, use the current month.
         today = date.today()
 
-        # Start from the first day of the current month.
-        start_date = today.replace(day=1)
+        if month is None and year is None:
+            month = today.month
+            year = today.year
 
-        # Calculate the first day of the next month.
-        if today.month == 12:
-            end_date = date(today.year + 1, 1, 1)
+        # Calculate the selected month's date range.
+        start_date = date(year, month, 1)
+
+        if month == 12:
+            end_date = date(year + 1, 1, 1)
         else:
-            end_date = date(today.year, today.month + 1, 1)
+            end_date = date(year, month + 1, 1)
 
-        # Fetch individual payments for this building and month.
+        # Fetch individual payments for the selected month.
         payments = payment_repository.get_building_payments_for_period(
             db=db,
             owner_id=owner_id,
@@ -593,7 +605,7 @@ class MonthlyRentService:
             end_date=end_date
         )
 
-        # Calculate the total from actual payment transactions.
+        # Calculate the total collected during the selected month.
         total_collected = payment_repository.get_total_collected_for_period(
             db=db,
             owner_id=owner_id,
@@ -602,7 +614,6 @@ class MonthlyRentService:
             end_date=end_date
         )
 
-        # Convert query rows into API-friendly dictionaries.
         transactions = [
             {
                 "payment_id": payment.payment_id,

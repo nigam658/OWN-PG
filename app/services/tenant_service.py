@@ -10,6 +10,7 @@ from app.models.bed_allocation_model import AllocationStatus
 from app.models.bed_model import BedStatus
 from app.repository.monthlyRent_repository import monthly_rent_repository
 from app.utils.date_utils import get_next_due_date
+from app.models.monthlyrent_model import MonthlyRent
 
 class TenantService:
 
@@ -511,6 +512,28 @@ class TenantService:
                 "message": "Tenant not found."
             }
 
+        # 4. Get monthly rent history for this allocation
+        rent_history = (
+            db.query(MonthlyRent)
+            .filter(
+                MonthlyRent.bed_allocation_id == allocation.id
+            )
+            .order_by(MonthlyRent.billing_month.desc())
+            .all()
+        )
+
+        rent_history_data = [
+            {
+                "id": rent.id,
+                "billing_month": rent.billing_month.isoformat(),
+                "due_date": rent.due_date.isoformat(),
+                "rent_amount": float(rent.rent_amount),
+                "paid_amount": float(rent.paid_amount),
+                "status": rent.status.value
+            }
+            for rent in rent_history
+        ]
+
         # Calculate the next scheduled rent date using the original
         # check-in day and the same billing rule as rent generation.
         today = date.today()
@@ -527,7 +550,8 @@ class TenantService:
             "success": True,
             "tenant": tenant,
             "allocation": allocation,
-            "next_rent_date": next_rent_date.isoformat()
+            "next_rent_date": next_rent_date.isoformat(),
+            "rent_history": rent_history_data
         }
     
 
