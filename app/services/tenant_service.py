@@ -12,9 +12,23 @@ from app.repository.monthlyRent_repository import monthly_rent_repository
 from app.utils.date_utils import get_next_due_date
 from app.models.monthlyrent_model import MonthlyRent
 
+from app.cloudflare.image_compression_service import (image_compression_service)
+from app.cloudflare.tenant_document_storage_service import (tenant_document_storage_service)
+from app.cloudflare.r2_storage_service import r2_storage_service
+from app.models.tenant_document import TenantDocument
+
 class TenantService:
 
-    def add_tenant(self, db: Session, bed_id: int, tenant_data, owner_id : int ):
+    def add_tenant(
+        self,
+        db: Session,
+        bed_id: int,
+        tenant_data,
+        owner_id: int,
+        profile_photo_bytes: bytes | None = None,
+        document_front_bytes: bytes | None = None,
+        document_back_bytes: bytes | None = None
+    ):
 
         # Check bed exists
         bed = bed_repository.get_bed_by_id(db, bed_id)
@@ -45,9 +59,11 @@ class TenantService:
                 "message": "Cannot add tenant to an inactive bed."
             }
 
-
         # Check bed already has tenant
-        allocation = bed_allocation_repository.get_active_allocation_by_bed_id(db=db, bed_id=bed_id)
+        allocation = bed_allocation_repository.get_active_allocation_by_bed_id(
+            db=db,
+            bed_id=bed_id
+        )
 
         if allocation:
             return {
@@ -55,23 +71,29 @@ class TenantService:
                 "message": "Bed already has a tenant."
             }
 
-        # Check phone number is not already used by another active tenant
+        # Check duplicate active phone number
         existing_tenant = tenant_repository.get_active_tenant_by_phone(
             db=db,
             owner_id=owner_id,
             phone=tenant_data.phone
         )
 
-        # if any duplciate numeber exist it will return friendly error message
         if existing_tenant:
             return {
                 "success": False,
                 "message": "Phone number is already used by another active tenant."
             }
-        
-        try :
+
+        uploaded_keys = []
+
+        try:
+
             # Create tenant
-            new_tenant = tenant_repository.create_tenant(db, tenant_data, owner_id)
+            new_tenant = tenant_repository.create_tenant(
+                db,
+                tenant_data,
+                owner_id
+            )
 
             # Create bed allocation
             new_allocation = bed_allocation_repository.create_allocation(
@@ -83,8 +105,51 @@ class TenantService:
                 security_deposit=tenant_data.security_deposit
             )
 
-            # Create the first monthly rent only when the tenant's
-            # check-in date has arrived or has already passed.
+            # Upload profile photo if provided
+            if profile_photo_bytes is not None:
+
+                compressed_profile = image_compression_service.compress_image(
+                    profile_photo_bytes,
+                    image_type="profile"
+                )
+
+                tenant_document_storage_service.upload_profile_photo(
+                    tenant=new_tenant,
+                    file_bytes=compressed_profile,
+                    uploaded_keys=uploaded_keys
+                )
+
+            # Compress front document independently
+            compressed_front = None
+
+            if document_front_bytes is not None:
+                compressed_front = image_compression_service.compress_image(
+                    document_front_bytes,
+                    image_type="document"
+                )
+
+            # Compress back document independently
+            compressed_back = None
+
+            if document_back_bytes is not None:
+                compressed_back = image_compression_service.compress_image(
+                    document_back_bytes,
+                    image_type="document"
+                )
+
+            # Upload document if at least one side is provided
+            if compressed_front is not None or compressed_back is not None:
+
+                tenant_document_storage_service.upload_document(
+                    db=db,
+                    tenant_id=new_tenant.id,
+                    document_type="identity_document",
+                    front_bytes=compressed_front,
+                    back_bytes=compressed_back,
+                    uploaded_keys=uploaded_keys
+                )
+
+            # Create first monthly rent when check-in date has arrived
             if tenant_data.check_in_date <= date.today():
 
                 monthly_rent_repository.create_monthly_rent(
@@ -94,13 +159,25 @@ class TenantService:
                     rent_amount=tenant_data.rent
                 )
 
+            # Commit database changes
             db.commit()
 
-        except Exception:
-            # Undo Tenant + BedAllocation changes
-            db.rollback()
-            raise
+            db.refresh(new_tenant)
+            db.refresh(new_allocation)
 
+        except Exception:
+
+            # Roll back database changes
+            db.rollback()
+
+            # Delete every uploaded R2 file if database operation fails
+            for file_key in uploaded_keys:
+                try:
+                    r2_storage_service.delete_file(file_key)
+                except Exception:
+                    pass
+
+            raise
 
         return {
             "success": True,
@@ -109,8 +186,20 @@ class TenantService:
             "allocation": new_allocation
         }
 
-    # this function is update all tenant information which is comes through edit endpoint 
-    def update_tenant(self, db : Session,  tenant_id : int, tenant_data : TenantUpdate, owner_id: int ):
+
+
+
+    
+    def update_tenant(
+        self,
+        db: Session,
+        tenant_id: int,
+        tenant_data: TenantUpdate,
+        owner_id: int,
+        profile_photo_bytes: bytes | None = None,
+        document_front_bytes: bytes | None = None,
+        document_back_bytes: bytes | None = None
+    ):
 
         tenant = tenant_repository.get_active_tenant_by_id_and_owner(
             db=db,
@@ -124,17 +213,23 @@ class TenantService:
                 "message": "Active tenant not found."
             }
 
-        # 2. Get only fields sent by frontend
+        # Get only fields sent by frontend
         update_data = tenant_data.model_dump(exclude_unset=True)
 
-        # Check whether frontend sent any data for update
-        if not update_data:
+        # Check whether any data or image was provided
+        has_images = any([
+            profile_photo_bytes is not None,
+            document_front_bytes is not None,
+            document_back_bytes is not None
+        ])
+
+        if not update_data and not has_images:
             return {
                 "success": False,
                 "message": "No data provided for update."
             }
-        
-        # Check phone number only when frontend sends phone
+
+        # Check duplicate phone number
         if "phone" in update_data:
 
             existing_tenant = tenant_repository.get_other_active_tenant_by_phone(
@@ -149,8 +244,8 @@ class TenantService:
                     "success": False,
                     "message": "Phone number is already used by another active tenant."
                 }
-            
-        #  Fields that belong to Tenant table
+
+        # Tenant table fields
         tenant_fields = {
             "full_name",
             "phone",
@@ -160,38 +255,29 @@ class TenantService:
             "aadhaar_number"
         }
 
-        # it will collect all updated data for tenant table , when for loop execute
-        tenant_data_to_update = {}
+        tenant_data_to_update = {
+            key: value
+            for key, value in update_data.items()
+            if key in tenant_fields
+        }
 
-    
-        for key, value in update_data.items():
-
-            if key in tenant_fields:
-                tenant_data_to_update[key] = value
-
-
-        # Fields that belong to bed_allocation table
+        # Bed allocation fields
         allocation_fields = {
             "check_in_date",
             "rent",
             "security_deposit"
         }
 
-        # it will collect all updated data for bed_allocation table , when for loop execute
-        allocation_data_to_update = {}
-
-        
-        for key, value in update_data.items():
-
-            if  key in allocation_fields:
-                allocation_data_to_update[key] = value 
-
+        allocation_data_to_update = {
+            key: value
+            for key, value in update_data.items()
+            if key in allocation_fields
+        }
 
         allocation = None
 
         if allocation_data_to_update:
 
-            # Get current active allocation of this tenant
             allocation = bed_allocation_repository.get_active_allocation_by_tenant_id(
                 db=db,
                 tenant_id=tenant_id
@@ -203,22 +289,19 @@ class TenantService:
                     "message": "Active allocation not found."
                 }
 
-        
-        # Validate that the check-in date stays within its original month and year.
+        # Validate check-in date
         if "check_in_date" in allocation_data_to_update:
+
             new_check_in_date = allocation_data_to_update["check_in_date"]
 
-            # A check-in date cannot be empty.
             if new_check_in_date is None:
                 return {
                     "success": False,
                     "message": "Check-in date cannot be empty."
                 }
 
-            # Get the currently saved check-in date as the reference.
             current_check_in_date = allocation.check_in_date
 
-            # Reject any date belonging to a different month or year.
             if (
                 new_check_in_date.month != current_check_in_date.month
                 or new_check_in_date.year != current_check_in_date.year
@@ -231,8 +314,13 @@ class TenantService:
                     )
                 }
 
+        # Track newly uploaded and old R2 files
+        uploaded_keys = []
+        old_keys = []
 
-        try :
+        try:
+
+            # Update tenant information
             if tenant_data_to_update:
 
                 tenant_repository.update_tenant(
@@ -241,7 +329,7 @@ class TenantService:
                     data=tenant_data_to_update
                 )
 
-            # update active bedallocation information
+            # Update allocation information
             if allocation_data_to_update:
 
                 bed_allocation_repository.update_allocation(
@@ -249,21 +337,92 @@ class TenantService:
                     allocation_id=allocation.id,
                     data=allocation_data_to_update
                 )
-            # Save Tenant + BedAllocation changes together
+
+            # Replace profile photo
+            if profile_photo_bytes is not None:
+
+                compressed_profile = image_compression_service.compress_image(
+                    profile_photo_bytes,
+                    image_type="profile"
+                )
+
+                old_profile_key = tenant_document_storage_service.replace_profile_photo(
+                    tenant=tenant,
+                    file_bytes=compressed_profile,
+                    uploaded_keys=uploaded_keys
+                )
+
+                if old_profile_key:
+                    old_keys.append(old_profile_key)
+
+            # Replace Aadhaar front image
+            if document_front_bytes is not None:
+
+                compressed_front = image_compression_service.compress_image(
+                    document_front_bytes,
+                    image_type="document"
+                )
+
+                old_front_key = tenant_document_storage_service.replace_document_image(
+                    db=db,
+                    tenant_id=tenant_id,
+                    document_type="identity_document",
+                    side="front",
+                    file_bytes=compressed_front,
+                    uploaded_keys=uploaded_keys
+                )
+
+                if old_front_key:
+                    old_keys.append(old_front_key)
+
+            # Replace Aadhaar back image
+            if document_back_bytes is not None:
+
+                compressed_back = image_compression_service.compress_image(
+                    document_back_bytes,
+                    image_type="document"
+                )
+
+                old_back_key = tenant_document_storage_service.replace_document_image(
+                    db=db,
+                    tenant_id=tenant_id,
+                    document_type="identity_document",
+                    side="back",
+                    file_bytes=compressed_back,
+                    uploaded_keys=uploaded_keys
+                )
+
+                if old_back_key:
+                    old_keys.append(old_back_key)
+
+            # Commit all database changes together
             db.commit()
 
         except Exception:
 
-            # Undo all changes if any update fails
             db.rollback()
+
+            # Delete newly uploaded files if the transaction fails
+            for file_key in uploaded_keys:
+                try:
+                    r2_storage_service.delete_file(file_key)
+                except Exception:
+                    pass
 
             raise
 
-        
+        # Delete old images only after successful database commit
+        for file_key in old_keys:
+            try:
+                r2_storage_service.delete_file(file_key)
+            except Exception:
+                pass
+
         return {
             "success": True,
             "message": "Tenant updated successfully."
         }
+
 
 
     # Switch an active tenant to another bed.
@@ -512,6 +671,37 @@ class TenantService:
                 "message": "Tenant not found."
             }
 
+        # Get tenant identity document
+        document = db.query(TenantDocument).filter(
+            TenantDocument.tenant_id == tenant.id,
+            TenantDocument.document_type == "identity_document"
+        ).first()
+
+        # Generate temporary URLs for R2 images
+        profile_photo_url = (
+            r2_storage_service.generate_presigned_url(
+                file_key=tenant.profile_photo_key,
+                expiration=300
+            )
+            if tenant.profile_photo_key else None
+        )
+
+        document_front_url = (
+            r2_storage_service.generate_presigned_url(
+                file_key=document.front_file_key,
+                expiration=300
+            )
+            if document and document.front_file_key else None
+        )
+
+        document_back_url = (
+            r2_storage_service.generate_presigned_url(
+                file_key=document.back_file_key,
+                expiration=300
+            )
+            if document and document.back_file_key else None
+        )
+
         # 4. Get monthly rent history for this allocation
         rent_history = (
             db.query(MonthlyRent)
@@ -550,6 +740,9 @@ class TenantService:
             "success": True,
             "tenant": tenant,
             "allocation": allocation,
+            "profile_photo_url": profile_photo_url,
+            "document_front_url": document_front_url,
+            "document_back_url": document_back_url,
             "next_rent_date": next_rent_date.isoformat(),
             "rent_history": rent_history_data
         }

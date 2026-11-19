@@ -1,7 +1,14 @@
 from datetime import date
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
+from decimal import Decimal
+import calendar
+from datetime import date, timedelta
 
+from app.models.bed_model import BedStatus
+from app.models.bed_allocation_model import AllocationStatus
+from app.models.tenant_model import TenantStatus
+from app.models.monthlyrent_model import MonthlyRent
 from app.models.bed_allocation_model import BedAllocation
 from app.models.tenant_model import Tenant
 from app.models.bed_model import Bed
@@ -631,6 +638,139 @@ class MonthlyRentService:
             "total_collected": total_collected,
             "transactions": transactions
         }
+
+    
+    def get_upcoming_rent_collection(
+        self,
+        db: Session,
+        owner_id: int,
+        building_id: int
+    ):
+        # Verify that this building belongs to the logged-in owner.
+        building = (
+            db.query(Building)
+            .filter(
+                Building.id == building_id,
+                Building.owner_id == owner_id
+            )
+            .first()
+        )
+
+        if building is None:
+            raise HTTPException(
+                status_code=404,
+                detail="Building not found"
+            )
+
+        # Forecast period: tomorrow through the last day of this month.
+        today = now_ist().date()
+        start_date = today + timedelta(days=1)
+
+        last_day = calendar.monthrange(
+            today.year,
+            today.month
+        )[1]
+
+        end_date = today.replace(day=last_day)
+
+        total_upcoming = Decimal("0")
+        upcoming_tenants = []
+
+        # Find active allocations in this building.
+        # Both AVAILABLE and MAINTENANCE beds are eligible,
+        # provided they have an active tenant allocation.
+        allocations = (
+            db.query(BedAllocation, Tenant, Bed, Room)
+            .join(Tenant, BedAllocation.tenant_id == Tenant.id)
+            .join(Bed, BedAllocation.bed_id == Bed.id)
+            .join(Room, Bed.room_id == Room.id)
+            .join(Floor, Room.floor_id == Floor.id)
+            .join(Building, Floor.building_id == Building.id)
+            .filter(
+                Building.id == building_id,
+                Building.owner_id == owner_id,
+                Room.is_active == True,
+                Bed.status.in_([
+                    BedStatus.AVAILABLE,
+                    BedStatus.MAINTENANCE
+                ]),
+                BedAllocation.status == AllocationStatus.ACTIVE,
+                BedAllocation.is_vacating == False,
+                Tenant.status == TenantStatus.ACTIVE
+            )
+            .all()
+        )
+
+        for allocation, tenant, bed, room in allocations:
+
+            # Do not forecast rent before the tenant checks in.
+            if allocation.check_in_date > today:
+                continue
+
+            # Calculate the next expected rent due date using
+            # the same cycle logic as normal rent generation.
+            expected_due_date = allocation.check_in_date
+
+            while expected_due_date <= today:
+                expected_due_date = get_next_due_date(
+                    current_due_date=expected_due_date,
+                    original_rent_day=allocation.check_in_date.day
+                )
+
+            # Include only due dates inside the forecast period.
+            if not (start_date <= expected_due_date <= end_date):
+                continue
+
+            billing_month = expected_due_date.replace(day=1)
+
+            # Check whether a MonthlyRent record already exists.
+            existing_rent = (
+                db.query(MonthlyRent)
+                .filter(
+                    MonthlyRent.bed_allocation_id == allocation.id,
+                    MonthlyRent.billing_month == billing_month
+                )
+                .first()
+            )
+
+            if existing_rent:
+                rent_amount = existing_rent.rent_amount
+                paid_amount = existing_rent.paid_amount
+            else:
+                rent_amount = allocation.rent
+                paid_amount = Decimal("0")
+
+            remaining_amount = max(
+                rent_amount - paid_amount,
+                Decimal("0")
+            )
+
+            if remaining_amount <= 0:
+                continue
+
+            total_upcoming += remaining_amount
+
+            upcoming_tenants.append({
+                "tenant_id": tenant.id,
+                "tenant_name": tenant.full_name,
+                "bed_id": bed.id,
+                "bed_number": bed.bed_number,
+                "room_number": room.room_number,
+                "due_date": expected_due_date,
+                "rent_amount": rent_amount,
+                "paid_amount": paid_amount,
+                "remaining_amount": remaining_amount
+            })
+
+        return {
+            "building_id": building_id,
+            "start_date": start_date,
+            "end_date": end_date,
+            "total_upcoming": total_upcoming,
+            "tenant_count": len(upcoming_tenants),
+            "tenants": upcoming_tenants
+        }
+
 
 
 monthly_rent_service = MonthlyRentService()

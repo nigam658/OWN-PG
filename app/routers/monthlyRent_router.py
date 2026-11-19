@@ -109,3 +109,20 @@ def get_building_payment_history(
         month=month,
         year=year
     )
+
+
+
+# Get upcoming rent collection for a specific building.
+@router.get("/building/{building_id}/upcoming-collection")
+def get_upcoming_rent_collection(
+    building_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user)
+):
+    owner_id = current_user
+
+    return monthly_rent_service.get_upcoming_rent_collection(
+        db=db,
+        owner_id=owner_id,
+        building_id=building_id
+    )

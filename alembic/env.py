@@ -47,6 +47,7 @@ from app.models.floor_model import Floor
 from app.models.room_model import Room
 from app.models.bed_model import Bed
 from app.models.tenant_model import Tenant
+from app.models.tenant_document import TenantDocument
 from app.models.bed_allocation_model import BedAllocation
 from app.models.monthlyrent_model import MonthlyRent
 from app.models.payment_model import Payment

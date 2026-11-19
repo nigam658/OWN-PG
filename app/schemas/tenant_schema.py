@@ -3,6 +3,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 from decimal import Decimal
 from zoneinfo import ZoneInfo
 import re
+from fastapi import Form
 
 from app.models.tenant_model import Gender
 
@@ -76,7 +77,39 @@ class TenantCreate(BaseModel):
 
 
 # this pydantic model used for update or edit a tabel
+
 class TenantUpdate(BaseModel):
+
+    @classmethod
+    def as_form(
+        cls,
+        full_name: str | None = Form(None),
+        phone: str | None = Form(None),
+        gender: Gender | None = Form(None),
+        permanent_address: str | None = Form(None),
+        emergency_contact_phone: str | None = Form(None),
+        aadhaar_number: str | None = Form(None),
+        check_in_date: date | None = Form(None),
+        rent: Decimal | None = Form(None),
+        security_deposit: Decimal | None = Form(None),
+    ):
+        form_data = {
+            "full_name": full_name,
+            "phone": phone,
+            "gender": gender,
+            "permanent_address": permanent_address,
+            "emergency_contact_phone": emergency_contact_phone,
+            "aadhaar_number": aadhaar_number,
+            "check_in_date": check_in_date,
+            "rent": rent,
+            "security_deposit": security_deposit,
+        }
+
+        return cls(**{
+            key: value
+            for key, value in form_data.items()
+            if value is not None
+        })
 
     # Tenant information
     full_name: str | None = None
@@ -105,7 +138,6 @@ class TenantUpdate(BaseModel):
 
         return value
 
-
     @field_validator(
         "phone",
         "emergency_contact_phone",
@@ -121,6 +153,7 @@ class TenantUpdate(BaseModel):
             raise ValueError("This field must contain only digits")
 
         return value
+
 
 # Request schema used when switching a tenant to another bed
 class SwitchTenantBed(BaseModel):

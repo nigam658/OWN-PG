@@ -34,6 +34,8 @@ class Tenant(Base):
 
     aadhaar_number = Column(String(12), nullable=True)
 
+    profile_photo_key = Column(String(500), nullable=True)
+
     # aadhaar_front = Column(String(255), nullable=True)
 
     # aadhaar_back = Column(String(255),nullable=True)
